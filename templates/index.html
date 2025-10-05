@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trading Helper</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>Trading Helper Dashboard</h1>
+
+        <!-- Add Stock -->
+        <section class="add-stock">
+            <h2>Add Stock</h2>
+            <input type="text" id="stock-symbol" placeholder="Enter Stock Symbol">
+            <button id="add-stock-btn">Add Stock</button>
+            <p id="add-stock-msg"></p>
+        </section>
+
+        <!-- Run Trading -->
+        <section class="run-trading">
+            <h2>Run Trading & ML Analysis</h2>
+            <input type="text" id="trade-symbol" placeholder="Enter Stock Symbol">
+            <select id="interval">
+                <option value="1minute">1 Minute</option>
+                <option value="5minute" selected>5 Minutes</option>
+                <option value="15minute">15 Minutes</option>
+                <option value="30minute">30 Minutes</option>
+                <option value="1day">1 Day</option>
+            </select>
+            <button id="run-trading-btn">Run</button>
+            <p id="trading-msg"></p>
+        </section>
+
+        <!-- Trades Summary -->
+        <section class="trading-summary">
+            <h2>Trade Summary</h2>
+            <div id="trades-output"></div>
+            <div id="summary-output"></div>
+        </section>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/scripts.js') }}"></script>
+</body>
+</html>
