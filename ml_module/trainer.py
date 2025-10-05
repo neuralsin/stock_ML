@@ -28,7 +28,7 @@ class TransformerBlock:
         ffn = Dropout(self.rate)(ffn)
         return LayerNormalization(epsilon=1e-6)(out1 + ffn)
 
-# ---------------- LSTM Model for stock ----------------
+# ---------------- LSTM Model ----------------
 class MLModel:
     def __init__(self, seq_len=50, feature_dim=5):
         self.seq_len = seq_len
@@ -43,7 +43,7 @@ class MLModel:
             Dropout(0.2),
             LSTM(32),
             Dropout(0.2),
-            Dense(1, activation='tanh')  # -1 to 1 for sell/buy
+            Dense(1, activation='tanh')
         ])
         model.compile(optimizer='adam', loss='mse')
         return model
@@ -61,10 +61,10 @@ class MLModel:
             return 0
         X_seq = np.expand_dims(X_seq, axis=0)
         pred = self.model.predict(X_seq, verbose=0)[0][0]
-        threshold = 0.05  # lowered threshold to reduce 0 PnL
+        threshold = 0.05
         if abs(pred) < threshold:
             return 0
-        return int(np.sign(pred))  # 1=BUY, -1=SELL
+        return int(np.sign(pred))
 
     def preprocess(self, df):
         df = df[['Open','High','Low','Close','Volume']].fillna(method='ffill')
@@ -84,7 +84,7 @@ class TransformerModel:
     def build_transformer(self):
         inputs = Input(shape=(self.seq_len, self.feature_dim))
         x = TransformerBlock(embed_dim=self.feature_dim)(inputs)
-        x = Dense(1, activation='tanh')(x[:,-1,:])
+        x = Dense(1, activation='tanh')(x[:, -1, :])
         model = Model(inputs, x)
         model.compile(optimizer='adam', loss='mse')
         return model
@@ -129,10 +129,23 @@ class MLTrainer:
         if not os.path.exists(self.paper_trades_file):
             pd.DataFrame(columns=["Symbol","Date","Action","Price","Next_Close","PnL"]).to_csv(self.paper_trades_file,index=False)
 
+        # Load global model if available
+        if self.global_model_enabled:
+            global_path = os.path.join(self.model_path, "global_transformer.h5")
+            if os.path.exists(global_path):
+                self.global_model.model = load_model(global_path)
+                print("[✓] Loaded saved global Transformer model")
+
     def add_stock(self, symbol):
         if symbol not in self.stocks_data:
             self.stocks_data[symbol] = pd.DataFrame()
             self.models[symbol] = MLModel()
+
+            model_file = os.path.join(self.model_path, f"{symbol}.h5")
+            if os.path.exists(model_file):
+                self.models[symbol].model = load_model(model_file)
+                print(f"[✓] Loaded saved model for {symbol}")
+
             self.total_pnl[symbol] = 0.0
             self.session_pnl[symbol] = 0.0
 
@@ -141,25 +154,21 @@ class MLTrainer:
             return
         self.add_stock(symbol)
 
-        # Ensure required columns
         for col in ['Open','High','Low','Close','Volume']:
             if col not in new_data.columns:
                 new_data[col] = 0.0
         if 'Datetime' not in new_data.columns:
             new_data['Datetime'] = pd.to_datetime(np.arange(len(new_data)))
 
-        # Merge with existing
         self.stocks_data[symbol] = pd.concat([self.stocks_data[symbol], new_data]) \
             .drop_duplicates(subset='Datetime') \
             .sort_values('Datetime').reset_index(drop=True)
 
-        # global dataset
         if self.global_model_enabled:
-            self.combined_dataset = pd.concat([self.combined_dataset,new_data]) \
+            self.combined_dataset = pd.concat([self.combined_dataset, new_data]) \
                 .drop_duplicates(subset='Datetime') \
                 .sort_values('Datetime').reset_index(drop=True)
 
-        # Run paper trades first, then train
         self.simulate_confident_trades(symbol)
         self.train(symbol)
 
@@ -175,7 +184,7 @@ class MLTrainer:
 
     def train(self, symbol):
         df = self.stocks_data[symbol]
-        if len(df)<51:
+        if len(df) < 51:
             print(f"[!] Not enough rows for {symbol}")
             return
 
@@ -185,25 +194,26 @@ class MLTrainer:
 
         final_loss = history.history['loss'][-1] if history else 0
         session_profit = self.session_pnl[symbol]
-
-        # only update total PnL once per session
         self.total_pnl[symbol] += session_profit
 
-        # train global model
-        if self.global_model_enabled and len(self.combined_dataset)>=51:
+        # Save the trained model
+        model.model.save(os.path.join(self.model_path, f"{symbol}.h5"))
+
+        # Train + save global transformer
+        if self.global_model_enabled and len(self.combined_dataset) >= 51:
             Xg, yg = self.prepare_sequences(self.combined_dataset)
             self.global_model.train(Xg, yg, epochs=10)
+            self.global_model.model.save(os.path.join(self.model_path, "global_transformer.h5"))
 
-        # log stats
         pd.DataFrame([{
-            "symbol":symbol,
-            "rows_trained":len(df),
-            "epochs_run":len(history.history['loss']) if history else 0,
-            "final_loss":round(final_loss,6),
-            "dataset_start":df['Datetime'].iloc[0],
-            "dataset_end":df['Datetime'].iloc[-1],
-            "session_pnl":round(session_profit,4),
-            "total_pnl":round(self.total_pnl[symbol],4)
+            "symbol": symbol,
+            "rows_trained": len(df),
+            "epochs_run": len(history.history['loss']) if history else 0,
+            "final_loss": round(final_loss,6),
+            "dataset_start": df['Datetime'].iloc[0],
+            "dataset_end": df['Datetime'].iloc[-1],
+            "session_pnl": round(session_profit,4),
+            "total_pnl": round(self.total_pnl[symbol],4)
         }]).to_csv(self.log_file, mode='a', header=False, index=False)
 
         print(f"[✓] Trained {symbol}, final_loss={round(final_loss,6)}, session_pnl={round(session_profit,4)}")
@@ -212,11 +222,11 @@ class MLTrainer:
     def simulate_confident_trades(self, symbol):
         df = self.stocks_data[symbol].copy()
         trades = []
-        if len(df)<51:
+        if len(df) < 51:
             return trades
 
         seq_len = 50
-        for i in range(seq_len,len(df)-1):
+        for i in range(seq_len, len(df)-1):
             window = df.iloc[i-seq_len:i+1]
             X_seq = window[['Open','High','Low','Close','Volume']].astype(float).to_numpy()
             signal = self.models[symbol].predict_next_move(X_seq)
@@ -225,25 +235,23 @@ class MLTrainer:
             pnl = 0
             action = "HOLD"
 
-            if signal==1:
+            if signal == 1:
                 pnl = next_close - today_close
                 action = "BUY"
-            elif signal==-1:
+            elif signal == -1:
                 pnl = today_close - next_close
                 action = "SELL"
 
             trades.append(pnl)
 
-            # log each trade
             pd.DataFrame([{
-                "Symbol":symbol,
-                "Date":df['Datetime'].iloc[i+1],
-                "Action":action,
-                "Price":today_close,
-                "Next_Close":next_close,
-                "PnL":pnl
+                "Symbol": symbol,
+                "Date": df['Datetime'].iloc[i+1],
+                "Action": action,
+                "Price": today_close,
+                "Next_Close": next_close,
+                "PnL": pnl
             }]).to_csv(self.paper_trades_file, mode='a', header=False, index=False)
 
-        # only update session PnL
         self.session_pnl[symbol] = sum(trades)
         return trades
