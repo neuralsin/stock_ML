@@ -1,81 +1,46 @@
-<!-- templates/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trading Helper Dashboard</title>
+    <title>Trading Helper</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body>
-    <header>
+    <div class="container">
         <h1>Trading Helper Dashboard</h1>
-        <p>Monitor virtual trades and optimize your strategy</p>
-    </header>
 
-    <main>
-        <!-- Symbol Input Section -->
-        <section id="symbol-input-section">
-            <h2>Add Symbols to Monitor</h2>
-            <form id="symbol-form">
-                <input type="text" id="symbol-input" placeholder="Enter symbol (e.g. AAPL)" required>
-                <button type="submit">Add Symbol</button>
-            </form>
-            <ul id="symbol-list">
-                <!-- Added symbols will appear here -->
-            </ul>
+        <!-- Add Stock -->
+        <section class="add-stock">
+            <h2>Add Stock</h2>
+            <input type="text" id="stock-symbol" placeholder="Enter Stock Symbol">
+            <button id="add-stock-btn">Add Stock</button>
+            <p id="add-stock-msg"></p>
         </section>
 
-        <!-- Virtual Trading Section -->
-        <section id="virtual-trades-section">
-            <h2>Virtual Trades</h2>
-            <table id="trades-table">
-                <thead>
-                    <tr>
-                        <th>Symbol</th>
-                        <th>Trade Type</th>
-                        <th>Entry Price</th>
-                        <th>Exit Price</th>
-                        <th>Qty</th>
-                        <th>PnL</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Trades will be dynamically populated here -->
-                </tbody>
-            </table>
+        <!-- Run Trading -->
+        <section class="run-trading">
+            <h2>Run Trading & ML Analysis</h2>
+            <input type="text" id="trade-symbol" placeholder="Enter Stock Symbol">
+            <select id="interval">
+                <option value="1minute">1 Minute</option>
+                <option value="5minute" selected>5 Minutes</option>
+                <option value="15minute">15 Minutes</option>
+                <option value="30minute">30 Minutes</option>
+                <option value="1day">1 Day</option>
+            </select>
+            <button id="run-trading-btn">Run</button>
+            <p id="trading-msg"></p>
         </section>
 
-        <!-- Reports Section -->
-        <section id="report-section">
-            <h2>Performance Report</h2>
-            <table id="report-table">
-                <thead>
-                    <tr>
-                        <th>Symbol</th>
-                        <th>Total Trades</th>
-                        <th>Wins</th>
-                        <th>Losses</th>
-                        <th>Win Rate</th>
-                        <th>Avg PnL</th>
-                        <th>Max Drawdown</th>
-                        <th>Profit Factor</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Report data will be populated here -->
-                </tbody>
-            </table>
+        <!-- Trades Summary -->
+        <section class="trading-summary">
+            <h2>Trade Summary</h2>
+            <div id="trades-output"></div>
+            <div id="summary-output"></div>
         </section>
-    </main>
-
-    <footer>
-        <p>&copy; 2025 Trading Helper. All rights reserved.</p>
-    </footer>
+    </div>
 
     <script src="{{ url_for('static', filename='js/scripts.js') }}"></script>
 </body>
 </html>
-
-<!-- finished -->

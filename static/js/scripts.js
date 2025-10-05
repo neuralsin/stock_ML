@@ -1,81 +1,63 @@
-// static/js/scripts.js
+document.addEventListener('DOMContentLoaded', () => {
+    const addBtn = document.getElementById('add-stock-btn');
+    const runBtn = document.getElementById('run-trading-btn');
 
-document.addEventListener("DOMContentLoaded", () => {
-    const symbolForm = document.getElementById("symbol-form");
-    const symbolInput = document.getElementById("symbol-input");
-    const symbolList = document.getElementById("symbol-list");
-    const runButton = document.getElementById("run-engine");
-    const reportTable = document.getElementById("report-table");
+    const stockInput = document.getElementById('stock-symbol');
+    const tradeSymbolInput = document.getElementById('trade-symbol');
+    const intervalSelect = document.getElementById('interval');
 
-    let symbols = [];
+    const addMsg = document.getElementById('add-stock-msg');
+    const tradeMsg = document.getElementById('trading-msg');
+    const tradesOutput = document.getElementById('trades-output');
+    const summaryOutput = document.getElementById('summary-output');
 
-    symbolForm.addEventListener("submit", (e) => {
-        e.preventDefault();
-        const symbol = symbolInput.value.trim().toUpperCase();
-        if (symbol && !symbols.includes(symbol)) {
-            symbols.push(symbol);
-            const li = document.createElement("li");
-            li.textContent = symbol;
-            symbolList.appendChild(li);
-            symbolInput.value = "";
-        }
-    });
-
-    runButton.addEventListener("click", async () => {
-        if (symbols.length === 0) {
-            alert("Add at least one symbol to run the engine!");
+    // Add stock
+    addBtn.addEventListener('click', async () => {
+        const symbol = stockInput.value.trim().toUpperCase();
+        if (!symbol) {
+            addMsg.textContent = "Please enter a stock symbol.";
             return;
         }
 
-        runButton.disabled = true;
-        runButton.textContent = "Running...";
+        const res = await fetch('/add_stock', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({symbol})
+        });
 
-        try {
-            const response = await fetch("/run_engine", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ symbols })
-            });
-
-            const data = await response.json();
-            renderReport(data);
-        } catch (err) {
-            console.error("Error running engine:", err);
-            alert("Something went wrong. Check console.");
-        } finally {
-            runButton.disabled = false;
-            runButton.textContent = "Run Engine";
-        }
+        const data = await res.json();
+        addMsg.textContent = data.message;
+        stockInput.value = '';
     });
 
-    function renderReport(reportData) {
-        reportTable.innerHTML = `
-            <thead>
-                <tr>
-                    <th>Symbol</th>
-                    <th>Total Trades</th>
-                    <th>Wins</th>
-                    <th>Losses</th>
-                    <th>Win Rate</th>
-                    <th>Avg PnL</th>
-                    <th>Max Drawdown</th>
-                    <th>Profit Factor</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${reportData.map(row => `
-                    <tr>
-                        <td>${row.symbol}</td>
-                        <td>${row.total_trades}</td>
-                        <td>${row.wins}</td>
-                        <td>${row.losses}</td>
-                        <td>${row.win_rate}</td>
-                        <td>${row.avg_pnl}</td>
-                        <td>${row.max_drawdown}</td>
-                        <td>${row.profit_factor}</td>
-                    </tr>
-                `).join("")}
-            </tbody>
-        `;
-    }
+    // Run trading engine
+    runBtn.addEventListener('click', async () => {
+        const symbol = tradeSymbolInput.value.trim().toUpperCase();
+        const interval = intervalSelect.value;
+
+        if (!symbol) {
+            tradeMsg.textContent = "Enter a stock symbol to run trading.";
+            return;
+        }
+
+        tradeMsg.textContent = "Running trading engine...";
+        tradesOutput.innerHTML = '';
+        summaryOutput.innerHTML = '';
+
+        const res = await fetch('/run_trading', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({symbol, interval})
+        });
+
+        const data = await res.json();
+
+        if (data.success) {
+            tradeMsg.textContent = "Trading analysis completed!";
+            tradesOutput.innerHTML = `<pre>${JSON.stringify(data.trades, null, 2)}</pre>`;
+            summaryOutput.innerHTML = `<pre>${JSON.stringify(data.summary, null, 2)}</pre>`;
+        } else {
+            tradeMsg.textContent = "Error: " + data.message;
+        }
+    });
 });
